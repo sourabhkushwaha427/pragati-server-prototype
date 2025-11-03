@@ -95,7 +95,8 @@ FROM (
 
 const getSalesDistribution = async (req, res) => {
   try {
-    // Query: category-wise total sales
+    const company_id = req.user.company_id; // ✅ Ensure company scoping
+
     const result = await pool.query(`
       SELECT 
         i.category,
@@ -104,21 +105,20 @@ const getSalesDistribution = async (req, res) => {
       JOIN items i ON ii.item_id = i.id
       JOIN invoices inv ON inv.id = ii.invoice_id
       WHERE inv.status = 'paid'
+        AND inv.company_id = $1  -- ✅ filter by company
       GROUP BY i.category
       ORDER BY total_amount DESC;
-    `);
+    `, [company_id]);
 
     if (result.rows.length === 0) {
       return res.status(200).json({ sales_distribution: [] });
     }
 
-    // Total revenue across all categories
     const grandTotal = result.rows.reduce(
       (sum, row) => sum + Number(row.total_amount),
       0
     );
 
-    // Map with percentages
     const sales_distribution = result.rows.map((row) => ({
       category: row.category,
       amount: Number(row.total_amount),
